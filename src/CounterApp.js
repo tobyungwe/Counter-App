@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { ethers } from "ethers";
 
 // ABI van jouw Counter contract
@@ -12,14 +12,12 @@ export default function CounterApp() {
   const [signer, setSigner] = useState(null);
   const [address, setAddress] = useState(null);
   const [counter, setCounter] = useState(0);
+  const [txStatus, setTxStatus] = useState(""); // statusmelding
   const contractAddress = process.env.REACT_APP_COUNTER_ADDRESS;
 
-  // Connect wallet functie
+  // Connect wallet
   const connectWallet = async () => {
-    if (!window.ethereum) {
-      alert("Please install MetaMask!");
-      return;
-    }
+    if (!window.ethereum) return alert("Please install MetaMask!");
     try {
       await window.ethereum.request({ method: "eth_requestAccounts" });
       const ethProvider = new ethers.BrowserProvider(window.ethereum);
@@ -29,26 +27,41 @@ export default function CounterApp() {
       const addr = await s.getAddress();
       setAddress(addr);
     } catch (err) {
-      console.error("Error connecting wallet:", err);
+      console.error(err);
+      setTxStatus("Wallet connection failed ❌");
     }
   };
 
-  // Disconnect wallet (simpele manier: reset state)
+  // Disconnect wallet
   const disconnectWallet = () => {
     setSigner(null);
     setProvider(null);
     setAddress(null);
+    setTxStatus("");
+  };
+
+  // Copy address
+  const copyAddress = () => {
+    if (address) {
+      navigator.clipboard.writeText(address);
+      setTxStatus("Address copied to clipboard ✅");
+      setTimeout(() => setTxStatus(""), 2000); // reset na 2s
+    }
   };
 
   // Get counter value
   const getNumber = async () => {
     if (!provider) return;
     try {
+      setTxStatus("Fetching counter... ⏳");
       const contract = new ethers.Contract(contractAddress, counterAbi, provider);
       const value = await contract.number();
       setCounter(value.toString());
+      setTxStatus("Counter fetched ✅");
+      setTimeout(() => setTxStatus(""), 2000); // reset na 2s
     } catch (err) {
       console.error(err);
+      setTxStatus("Failed to fetch counter ❌");
     }
   };
 
@@ -57,11 +70,15 @@ export default function CounterApp() {
     if (!signer) return;
     try {
       const contract = new ethers.Contract(contractAddress, counterAbi, signer);
+      setTxStatus("Transaction pending... ⏳");
       const tx = await contract.increment();
       await tx.wait();
+      setTxStatus("Increment successful ✅");
       getNumber();
+      setTimeout(() => setTxStatus(""), 2000);
     } catch (err) {
       console.error(err);
+      setTxStatus("Increment failed ❌");
     }
   };
 
@@ -101,7 +118,13 @@ export default function CounterApp() {
       fontSize: "3rem",
       fontWeight: "700",
       color: "#0A0B0D",
-      marginBottom: "25px",
+      marginBottom: "15px",
+    },
+    txStatus: {
+      fontSize: "1rem",
+      color: "#0A0B0D",
+      marginBottom: "15px",
+      minHeight: "24px",
     },
     button: {
       backgroundColor: "#0052FF",
@@ -134,7 +157,15 @@ export default function CounterApp() {
           </button>
         ) : (
           <>
-            <div style={styles.address}>Connected: {address}</div>
+            <div style={styles.address}>
+              Connected: {address}{" "}
+              <button
+                onClick={copyAddress}
+                style={{ ...styles.button, padding: "6px 12px", fontSize: "0.8rem" }}
+              >
+                Copy
+              </button>
+            </div>
             <button
               style={styles.button}
               onClick={disconnectWallet}
@@ -148,6 +179,8 @@ export default function CounterApp() {
 
         {/* Counter */}
         <p style={styles.counter}>{counter}</p>
+        <p style={styles.txStatus}>{txStatus}</p>
+
         <div>
           <button
             style={styles.button}
